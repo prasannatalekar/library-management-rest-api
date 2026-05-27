@@ -1,6 +1,9 @@
 package com.prasanna.library.management.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -9,7 +12,6 @@ import com.prasanna.library.management.dto.LoginResponse;
 import com.prasanna.library.management.dto.UserDto;
 import com.prasanna.library.management.exception.AuthenticationException;
 import com.prasanna.library.management.exception.ConflictException;
-import com.prasanna.library.management.exception.ResourceNotFoundException;
 import com.prasanna.library.management.model.User;
 import com.prasanna.library.management.repository.UserRepo;
 
@@ -21,6 +23,12 @@ public class AuthService {
 	
 	@Autowired
 	private PasswordEncoder passwordEncoder;
+	
+	@Autowired
+	private AuthenticationManager authenticationManager;
+	
+	@Autowired
+	private JwtService jwtService;
 	
 	public String register(UserDto userDto,String role) {
 		
@@ -44,16 +52,16 @@ public class AuthService {
 	
 	public LoginResponse login(LoginRequest loginRequest) {
 		
-		User user=userRepo.findByUsername(loginRequest.getUsername()).orElseThrow(()->new ResourceNotFoundException("User not found!"));
+		Authentication authentication=
+				authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
 		
-		if(!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword()))
-			throw new AuthenticationException("Invalid Credentials!");
+		if(!authentication.isAuthenticated())
+			throw new AuthenticationException("Invalid credentials!");
 		
-		LoginResponse loginResponse=new LoginResponse();
-		loginResponse.setUsername(user.getUsername());
-		loginResponse.setRole(user.getRole());
+		LoginResponse loginRespons = new LoginResponse();
+		loginRespons.setToken(jwtService.generateToken(loginRequest.getUsername()));
 		
-		return loginResponse;
+		return loginRespons;
 	}
 	
 }
