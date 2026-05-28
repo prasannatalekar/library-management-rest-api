@@ -1,6 +1,6 @@
 # 📚 Library Management REST API
 
-A **Spring Boot REST API** for managing a library system with role-based access control for **Admin** and **User** roles.
+A **Spring Boot REST API** for managing a library system with role-based access control for **Admin** and **User** roles, secured with **JWT Authentication**.
 
 ---
 
@@ -11,6 +11,7 @@ A **Spring Boot REST API** for managing a library system with role-based access 
 | Java 17 | Programming Language |
 | Spring Boot 3 | Application Framework |
 | Spring Security | Authentication & Authorization |
+| JWT (JSON Web Token) | Stateless Authentication |
 | Spring Data JPA | Database ORM |
 | MySQL | Relational Database |
 | Lombok | Boilerplate Reduction |
@@ -29,7 +30,9 @@ src/main/java/com/prasanna/library/management/
 ├── service/
 │   ├── AuthService.java
 │   ├── AdminService.java
-│   └── UserService.java
+│   ├── UserService.java
+│   ├── JwtService.java
+│   └── JwtFilter.java
 ├── repository/
 │   ├── BookRepo.java
 │   ├── UserRepo.java
@@ -80,16 +83,27 @@ src/main/java/com/prasanna/library/management/
 ### 🔐 Auth
 - Register as User
 - Register as Admin
-- Login
+- Login (returns JWT token)
 
 ---
 
 ## 🔐 Security
 
-- **Spring Security** with HTTP Basic Authentication
+- **JWT Authentication** — stateless token-based auth
 - **BCrypt** password encoding
 - **Role-based access control** — `ROLE_USER` and `ROLE_ADMIN`
 - **Stateless** session management
+- Token expiry — **1 hour**
+
+### JWT Flow
+```
+1. Client sends username/password to /api/auth/login
+2. Server validates credentials and returns JWT token
+3. Client sends token in every request header:
+   Authorization: Bearer <token>
+4. JwtFilter validates token on every request
+5. If valid → request proceeds to controller
+```
 
 ---
 
@@ -142,18 +156,19 @@ git clone https://github.com/prasannatalekar/library-management-rest-api.git
 cd library-management-rest-api
 ```
 
-**2. Configure database in `application.properties`:**
+**2. Create MySQL database:**
+```sql
+CREATE DATABASE library_db;
+```
+
+**3. Configure `application.properties`** (see `application.properties.example`):
 ```properties
 spring.datasource.url=jdbc:mysql://localhost:3306/library_db
 spring.datasource.username=your_mysql_username
 spring.datasource.password=your_mysql_password
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true
-```
-
-**3. Create MySQL database:**
-```sql
-CREATE DATABASE library_db;
+jwt.secret=your_secret_key_here
 ```
 
 **4. Run the application:**
@@ -173,7 +188,7 @@ Application runs on `http://localhost:8080`
 |---|---|---|
 | POST | `/api/auth/register/user` | Register a new user |
 | POST | `/api/auth/register/admin` | Register a new admin |
-| POST | `/api/auth/login` | Login |
+| POST | `/api/auth/login` | Login and get JWT token |
 
 **Register Request Body:**
 ```json
@@ -194,9 +209,16 @@ Application runs on `http://localhost:8080`
 }
 ```
 
+**Login Response:**
+```json
+{
+    "token": "eyJhbGciOiJIUzI1NiJ9..."
+}
+```
+
 ---
 
-### 👤 User APIs (Basic Auth — User Credentials)
+### 👤 User APIs (JWT Token Required)
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -208,7 +230,7 @@ Application runs on `http://localhost:8080`
 
 ---
 
-### 👨‍💼 Admin APIs (Basic Auth — Admin Credentials)
+### 👨‍💼 Admin APIs (JWT Token Required)
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -228,6 +250,22 @@ Application runs on `http://localhost:8080`
     "quantity": 5,
     "available": true
 }
+```
+
+---
+
+## 🔑 How to Use JWT in Postman
+
+**Step 1 — Login and copy token:**
+```
+POST http://localhost:8080/api/auth/login
+Response: { "token": "eyJhbGci..." }
+```
+
+**Step 2 — Add token to every request:**
+```
+Headers:
+Authorization: Bearer eyJhbGci...
 ```
 
 ---
@@ -258,11 +296,13 @@ All errors return a structured response:
 
 1. Register admin → `POST /api/auth/register/admin`
 2. Register user → `POST /api/auth/register/user`
-3. Add books → `POST /api/admin/addbook` *(admin credentials)*
-4. Get all books → `GET /api/user/books` *(user credentials)*
-5. Issue a book → `POST /api/user/issuebook/1` *(user credentials)*
-6. Check issue records → `GET /api/admin/issuerecords` *(admin credentials)*
-7. Return a book → `POST /api/user/returnbook/1` *(user credentials)*
+3. Login as admin → `POST /api/auth/login` → copy token
+4. Add books → `POST /api/admin/addbook` *(admin token)*
+5. Login as user → `POST /api/auth/login` → copy token
+6. Get all books → `GET /api/user/books` *(user token)*
+7. Issue a book → `POST /api/user/issuebook/1` *(user token)*
+8. Check issue records → `GET /api/admin/issuerecords` *(admin token)*
+9. Return a book → `POST /api/user/returnbook/1` *(user token)*
 
 ---
 
